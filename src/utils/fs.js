@@ -13,7 +13,7 @@ module.exports = {
     try {
       await unlinkFileAsync(path);
     } catch (err) {
-      console.log(`removeFile error: file ${path} doesn't exist...`);
+      throw new Error('error');
     }
   },
 

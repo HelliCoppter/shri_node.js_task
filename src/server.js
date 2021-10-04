@@ -24,9 +24,13 @@ app.use(multer({dest: imgFolder, fileFilter: fileFilter}).single("image"));
 app.use('/files', express.static(imgFolder));
 
 app.get('/list', (req, res) => {
-  const allImages = db.find().map((image) => image.toPublicJSON());
-
-  return res.json({ allImages });
+  try {
+    const allImages = db.find().map((image) => image.toPublicJSON());
+  
+    return res.send({ allImages });
+  } catch (err) {
+    res.status(404).send(err);
+  }
 });
 
 app.get('/image/:id', async (req, res) => {
@@ -54,26 +58,25 @@ app.get('/merge', async (req, res) => {
     // fs.writeFile(path.resolve(`${imgFolder}/result/result.jpeg`, res));
     // return res.json();
 
-    res.header('Content-Type', frontImg.mimeType);
     const picture = await replaceBackground(frontImg, backImg, color.split(','), threshold);
+    res.header('Content-Type', frontImg.mimeType);
     picture.pipe(res);
 
-    return res.json(req.query);
   } catch (err) {
-    res.status(404).send(err);
+    res.status(500).send(err);
   }
 });
 
 app.post('/upload', async (req, res) => {
   try {
-    const file = req.file;
+    const file = await req.file;
     const img = new Img(file.filename, file.path, file.mimetype, file.size);
 
-    await db.insert(img);
+    db.insert(img);
 
     return res.json(img.toPublicJSON());
   } catch (err) {
-    return res.status(404).send(err);
+    return res.status(500).send(err);
   }
 });
 
@@ -86,7 +89,7 @@ app.delete('/image/:id', async (req, res) => {
   
     return res.json({ id });
   } catch (err) {
-    return res.status(404).send(err);
+    return res.status(500).send(err);
   }
 });
 
