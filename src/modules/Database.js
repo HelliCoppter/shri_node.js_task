@@ -24,7 +24,7 @@ class Storage {
     }
   }
 
-  insert(id ,obj) {
+  insert(id, obj) {
     this.db[id] = obj;
     this._save(this.db);
     return
@@ -40,12 +40,9 @@ class Storage {
     }
   }
 
-  _save = async (content = {}) => {
+  _save = async (content) => {
+    if (!content) {content = {}}
     await writeFileAsync(path.resolve(dbDumpFile), JSON.stringify(content, null, '\t'));
-  }
-
-  _read = async (file) => {
-    await fs.readFile(dbDumpFile, 'utf-8');
   }
 }
 
