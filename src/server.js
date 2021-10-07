@@ -53,7 +53,7 @@ app.delete("/image/:id", (req, res) => {
       if (err) {
       } else {
         dataBase.delete(id);
-        res.status(200).send(id);
+        res.status(200).send({id});
       }
     });
   } catch (err) {
