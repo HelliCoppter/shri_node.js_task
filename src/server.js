@@ -36,10 +36,10 @@ app.get("/image/:id", (req, res) => {
   }
 });
 
-app.post("/upload", async (req, res) => {
+app.post("/upload", (req, res) => {
   try {
     const id = req.file.filename;
-    await dataBase.insert(id, { id, createdAt: Date.now(), ...req.file });
+    dataBase.insert(id, { id, createdAt: Date.now(), ...req.file });
     return res.send(id);
   } catch (err) {
     res.send(err);
