@@ -1,16 +1,13 @@
 const express = require('express');
 const fs = require('fs');
-const { PORT, imgFolder } = require('./config');
-const db = require('./entities/Database');
-const Img = require('./entities/Image');
 const multer = require('multer');
 const path = require('path');
-const app = express();
 const { replaceBackground } = require('backrem');
+const { PORT, imgFolder } = require('./modules/routes');
+const dataBase = require('./modules/Database');
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === "image/png" || 
-    file.mimetype === "image/jpg"|| 
+  if (file.mimetype === "image/jpg"|| 
     file.mimetype === "image/jpeg") {
       cb(null, true);
   }
@@ -19,77 +16,76 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-app.use(express.json());
+const app = express();
 app.use(multer({dest: imgFolder, fileFilter: fileFilter}).single("image"));
-app.use('/files', express.static(imgFolder));
 
-app.get('/list', (req, res) => {
+app.get("/list", (req, res) => {
+  res.json(
+    Object.values(dataBase.db).map((item) => ({ id: item.id, createdAt: item.createdAt, size: item.size, }))
+  );
+});
+
+app.get("/image/:id", (req, res) => {
   try {
-    const allImages = db.find().map((image) => image.toPublicJSON());
-  
-    return res.send({ allImages });
+    const id = req.params.id;
+    res.setHeader("Content-Type", dataBase.db[id].mimetype);
+    const image = fs.createReadStream(path.resolve(__dirname, dataBase.db[id].path));
+    image.pipe(res);
+  } catch (err) {
+    res.status(404).send();
+  }
+});
+
+app.post("/upload", async (req, res) => {
+  try {
+    const id = req.file.filename;
+    await dataBase.insert(id,{ id, createdAt: Date.now(), ...req.file });
+    return res.send(id);
+  } catch (err) {
+    res.send(err);
+  }
+});
+
+app.delete("/image/:id", (req, res) => {
+  const id = req.params.id;
+  try {
+    fs.unlink(path.resolve(dataBase.db[id].path), (err) => {
+      if (err) {
+      } else {
+        dataBase.delete(id);
+        res.status(200).send(id);
+      }
+    });
   } catch (err) {
     res.status(404).send(err);
   }
 });
 
-app.get('/image/:id', async (req, res) => {
-  try {
-    const imgId = req.params.id;
-    const image = db.findOne(imgId);
-    // const file = fs.createReadStream(path.resolve(image.path));
-
-    // return res.json(db.findOne(imgId).toPublicJSON());
-    res.sendFile(path.resolve(image.path));
-  } catch (err) {
-    res.status(404).send(err);
-  }
-});
-
-app.get('/merge', async (req, res) => {
+app.get("/merge", (req, res) => {
   try {
     const { front, back, color, threshold } = req.query;
-    const frontID = db.findOne(front);
-    const backID = db.findOne(back);
+    const frontID = dataBase.db[front];
+    const backID = dataBase.db[back];
     const frontImg = fs.createReadStream(path.resolve(frontID.path));
     const backImg = fs.createReadStream(path.resolve(backID.path));
+
+    if (!(front && back)) {
+      return res.status(404).send('image not found');
+    }
+
+    let colorArr;
+    // console.log(color);
+    try {
+      colorArr = color.split(',').map((item) => parseInt(item, 16));
+    } catch {
+      return res.status(400).send("invalid color");
+    }
+
+    res.header('Content-Type', "image/jpeg");
+    replaceBackground(frontImg, backImg, colorArr, threshold).then((readableStream) => readableStream.pipe(res));
     
-    // await replaceBackground(frontImg, backImg, color.split(','), threshold).then((readableStream) => readableStream.pipe(res));
-    // fs.writeFile(path.resolve(`${imgFolder}/result/result.jpeg`, res));
-    // return res.json();
-
-    const picture = await replaceBackground(frontImg, backImg, color.split(','), threshold);
-    res.header('Content-Type', frontImg.mimeType);
-    picture.pipe(res);
-
   } catch (err) {
-    res.status(500).send(err);
-  }
-});
-
-app.post('/upload', async (req, res) => {
-  try {
-    const file = await req.file;
-    const img = new Img(file.filename, file.path, file.mimetype, file.size);
-
-    db.insert(img);
-
-    return res.json(img.toPublicJSON());
-  } catch (err) {
-    return res.status(500).send(err);
-  }
-});
-
-
-app.delete('/image/:id', async (req, res) => {
-  try {
-    const imgId = req.params.id;
-  
-    const id = await db.remove(imgId);
-  
-    return res.json({ id });
-  } catch (err) {
-    return res.status(500).send(err);
+    res.status(400).send(err);
   }
 });
 
