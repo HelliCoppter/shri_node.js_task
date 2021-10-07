@@ -40,7 +40,7 @@ app.post("/upload", (req, res) => {
   try {
     const id = req.file.filename;
     dataBase.insert(id, { id, createdAt: Date.now(), ...req.file });
-    return res.send(id);
+    return res.send({id});
   } catch (err) {
     res.send(err);
   }
